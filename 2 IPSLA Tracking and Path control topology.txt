@@ -1,0 +1,232 @@
+STEP 1:-
+R1:-
+R1#conf term
+hostname R1
+interface Loopback 0
+description R1 LAN
+ip address 192.168.1.1 255.255.255.0
+interface Serial4/0
+description R1 --> ISP1
+ip address 209.165.201.2 255.255.255.252
+clock rate 128000
+bandwidth 128
+no shutdown
+interface Serial4/2
+description R1 --> ISP2
+ip address 209.165.202.130 255.255.255.252
+bandwidth 128
+no shutdown
+
+R2:-
+R2#conf term
+hostname ISP1
+interface Loopback0
+description Simulated Internet Web Server
+ip address 209.165.200.254 255.255.255.255
+interface Loopback1
+description ISP1 DNS Server
+ip address 209.165.201.30 255.255.255.255
+interface Serial4/0
+description ISP1 --> R1
+ip address 209.165.201.1 255.255.255.252
+bandwidth 128
+no shutdown
+interface Serial4/1
+description ISP1 --> ISP2
+ip address 209.165.200.225 255.255.255.252
+clock rate 128000
+bandwidth 128
+no shutdown
+
+R3:-
+R3#conf term
+hostname ISP2
+interface Loopback0
+description Simulated Internet Web Server
+ip address 209.165.200.254 255.255.255.255
+interface Loopback1
+description ISP2 DNS Server
+ip address 209.165.202.158 255.255.255.255
+interface Serial4/2
+description ISP2 --> R1
+ip address 209.165.202.129 255.255.255.252
+clock rate 128000
+bandwidth 128
+no shutdown
+interface Serial4/1
+description ISP2 --> ISP1
+ip address 209.165.200.226 255.255.255.252
+bandwidth 128
+no shutdown
+
+R1:-
+R1# show interfaces description
+
+STEP 2:-
+R1:-
+R1(config)#
+ip route 0.0.0.0 0.0.0.0 209.165.201.1
+
+R2:-
+R2(config)#
+router eigrp 1
+network 209.165.200.224 0.0.0.3
+network 209.165.201.0 0.0.0.31
+no auto-summary
+exit
+ip route 192.168.1.0 255.255.255.0 209.165.201.2
+
+R3:-
+R3(config)#
+router eigrp 1
+network 209.165.200.224 0.0.0.3
+network 209.165.202.128 0.0.0.31
+no auto-summary
+exit
+ip route 192.168.1.0 255.255.255.0 209.165.202.130
+end
+
+R1:-
+R1#tclsh
+R1(tcl)#
+foreach address {
+209.165.200.254
+209.165.201.30
+209.165.202.158
+} {
+ping $address source 192.168.1.1
+}
+
+R1(tcl)#
+foreach address {
+209.165.200.254
+209.165.201.30
+209.165.202.158
+} {
+trace $address source 192.168.1.1
+}
+
+STEP 3:-
+R1:-
+R1(config)
+ip sla 11
+icmp-echo 209.165.201.30
+frequency 10
+exit
+ip sla schedule 11 life forever start-time now
+end
+
+
+R1# 
+show ip sla configuration 11
+R1#
+
+R1#show ip sla statistics
+
+R1(config)#
+ip sla 22
+icmp-echo 209.165.202.158
+frequency 10
+exit
+ip sla schedule 22 life forever start-time now
+end
+R1#
+
+R1#show ip sla configuration 22
+
+R1#show ip sla statistics 22
+
+STEP 4:-
+a.
+R1(config)# 
+no ip route 0.0.0.0 0.0.0.0 209.165.201.1
+ip route 0.0.0.0 0.0.0.0 209.165.201.1 5
+exit
+
+b.
+R1# show ip route
+
+c.
+R1(config)# track 1 ip sla 11 reachability
+
+d.
+R1(config-track)# 
+delay down 10 up 1
+exit
+
+e.
+R1# 
+debug ip routing
+     IP routing debugging is on
+
+f.
+R1(config)# 
+ip route 0.0.0.0 0.0.0.0 209.165.201.1 2 track 1
+
+g.
+R1(config)# 
+track 2 ip sla 22 reachability
+delay down 10 up 1
+exit
+
+h.
+R1#
+show ip route | begin Gateway
+
+step 5:-
+R2:-
+a.
+ISP1(config)# 
+int lo1
+shutdown
+ISP1(config-if)#
+
+R1:-
+b.
+R1#
+
+c.
+R1#
+show ip route | begin Gateway
+
+d.
+R1#
+show ip sla statistics
+
+e.
+R1#
+trace 209.165.200.254 source 192.168.1.1
+R#
+
+R2(ISP1):-
+f.
+ISP1(config-if)#
+no shutdown
+
+R1:-
+R1#
+
+g.
+R1#
+show ip sla statistics
+IPSLAs Latest Operation Statistics
+IPSLA operation id: 11
+Latest RTT: 8 milliseconds
+Latest operation start time: 11:07:38 UTC Sat Jan 10 2015
+Latest operation return code: OK
+Number of successes: 182
+Number of failures: 75
+Operation time to live: Forever
+
+IPSLA operation id: 22
+Latest RTT: 16 milliseconds
+Latest operation start time: 11:07:39 UTC Sat Jan 10 2015
+Latest operation return code: OK
+Number of successes: 257
+Number of failures: 0
+Operation time to live: Forever
+
+h.
+R1#
+R1# show ip route | begin Gateway
+

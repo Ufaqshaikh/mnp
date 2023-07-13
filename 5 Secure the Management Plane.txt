@@ -1,0 +1,267 @@
+STEP 1:-
+R1:-
+R1#conf t
+hostname R1
+interface Loopback 0
+description R1 LAN
+ip address 192.168.1.1 255.255.255.0
+exit
+interface Serial4/0
+description R1 --> R2
+ip address 10.1.1.1 255.255.255.252
+clock rate 128000
+no shutdown
+exit
+end
+
+R2:-
+R2#conf t
+hostname R2
+interface Serial4/0
+description R2 --> R1
+ip address 10.1.1.2 255.255.255.252
+no shutdown
+exit
+interface Serial4/1
+description R2 --> R3
+ip address 10.2.2.1 255.255.255.252
+clock rate 128000
+no shutdown
+exit
+end
+
+R3:-
+R3#conf t
+hostname R3
+interface Loopback0
+description R3 LAN
+ip address 192.168.3.1 255.255.255.0
+exit
+interface Serial4/1
+description R3 --> R2
+ip address 10.2.2.2 255.255.255.252
+no shutdown
+exit
+end
+
+STEP 2:-
+a.
+R1:-
+R1(config)# ip route 0.0.0.0 0.0.0.0 10.1.1.2
+
+b.
+R3:-
+R3(config)# ip route 0.0.0.0 0.0.0.0 10.2.2.1
+
+c.
+R2:-
+R2(config)# 
+ip route 192.168.1.0 255.255.255.0 10.1.1.1
+ip route 192.168.3.0 255.255.255.0 10.2.2.2
+
+d.
+R1#tclsh
+R1(tcl)#
+foreach address {
+192.168.1.1
+10.1.1.1
+10.1.1.2
+10.2.2.1
+10.2.2.2
+192.168.3.1
+} { ping $address }
+
+
+STEP 3:-
+a.
+R1:-
+R1(config)# 
+security passwords min-length 10
+enable secret class12345
+
+c.
+R1(config)# 
+line console 0
+password ciscoconpass
+exec-timeout 5 0
+login
+logging synchronous
+exit
+
+d.
+R1(config)# 
+line vty 0 4
+password ciscovtypass
+exec-timeout 5 0
+login
+exit
+
+e.
+R1(config)# 
+line aux 0
+no exec
+end
+
+f.
+
+g.
+R1(config)# service password-encryption
+
+i.
+R1(config)# 
+banner motd $Unauthorized access strictly prohibited!$
+exit
+
+j.
+ Repeat STEP3 a to i in R3
+
+
+STEP 4:-
+a.
+R1:-
+R1(config)# 
+username JR-ADMIN secret class12345
+username ADMIN secret class54321
+
+b.
+R1:-
+R1(config)# 
+line console 0
+login local
+exit
+
+c.
+R1:-
+R1(config)# 
+line vty 0 4
+login local
+end
+
+d.
+    Repeat the steps 4a to 4c on R3.
+
+e.
+R1# telnet 10.2.2.2
+            Trying 10.2.2.2 ... Open
+            Unauthorized access strictly prohibieted!
+            User Access Verification
+            Username: ADMIN
+            Password: class54321
+            R3>
+
+STEP 5:-
+a.
+R1:-
+R1(config)# aaa new-model
+
+b.
+R1(config)#
+radius server RADIUS-1
+
+R1(config-radius-server)# 
+address ipv4 192.168.1.101
+key RADIUS-1-pa55w0rd
+exit
+
+c.
+R1(config)# 
+radius server RADIUS-2
+address ipv4 192.168.1.102
+key RADIUS-2-pa55w0rd
+exit
+
+d.
+R1(config)#
+aaa group server radius RADIUS-GROUP
+
+R1(config-sg-radius)# 
+server name RADIUS-1
+server name RADIUS-2
+exit
+
+e.
+R1(config)# 
+aaa authentication login default group RADIUS-GROUP local
+
+f.
+R1(config)# aaa authentication login TELNET-LOGIN group RADIUS-GROUP local-case
+
+g.
+R1(config)#
+line vty 0 4
+login authentication TELNET-LOGIN
+exit
+
+
+h.
+   Repeat the steps 5a to 5g on R3.
+
+i.
+R1# telnet 10.2.2.2
+            Trying 10.2.2.2 ... Open
+            Unauthorized access strictly prohibited!
+            User Access Verification
+            Username: ADMIN
+            Password: class54321
+            R3>
+
+
+STEP 6:-
+a.
+R1(config)# ip domain-name ccnasecurity.com
+
+b.
+R1(config)# crypto key zeroize rsa
+
+c.
+R1(config)# crypto key generate rsa general-keys modulus 1024
+          The name for the keys will be: R1.ccnasecurity.com
+          % The key modulus size is 1024 bits
+          % Generating 1024 bit RSA keys, keys will be non-exportable...[OK]
+
+          R1(config)#
+          Jan 10 13:44:44.711: %SSH-5-ENABLED: SSH 1.99 has been enabled
+          R1(config)#
+
+d.
+R1(config)# ip ssh version 2
+R1(config)#
+
+e.
+R1(config)# line vty 0 4
+transport input ssh
+end
+
+f.
+R1# show ip ssh
+
+g.
+Repeat the steps 6a to 6f on R3.
+
+h.
+R1# ssh -l ADMIN 10.2.2.2
+Password: 
+Unauthorized access strictly prohibited!
+R3>
+R3>en
+Password:
+R3#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,454 @@
+STEP 0:-
+R1(config)# no ip domain-lookup
+R1(config)# line con 0
+R1(config-line)# logging synchronous
+R1(config-line)# exec-timeout 0 0
+
+no ip domain-lookup
+line con 0
+logging synchronous
+exec-timeout 0 0
+exit
+
+R3(config)# no ip domain-lookup
+R3(config)# line con 0
+R3(config-line)# logging synchronous
+R3(config-line)# exec-timeout 0 0
+
+STEP 1:-
+R1:-
+R1#conf term
+ISP(config)# 
+hostname ISP
+interface Loopback0
+ip address 192.168.100.1 255.255.255.0
+exit
+interface Serial4/0
+description R1 --> R2
+ip address 192.168.1.5 255.255.255.252
+clock rate 128000
+no shutdown
+exit
+interface Serial4/1
+description R1 --> R3
+ip address 192.168.1.1 255.255.255.252
+no shutdown
+end
+
+
+R2:-
+R2#conf term
+R2(config)# 
+hostname SanJose1
+interface Loopback0
+ip address 172.16.64.1 255.255.255.0
+exit
+interface Serial4/0
+description R2 --> R1
+ip address 192.168.1.6 255.255.255.252
+no shutdown
+exit
+interface Serial4/2
+description R2 --> R3
+ip address 172.16.1.1 255.255.255.0
+clock rate 128000
+no shutdown
+end
+
+R3:-
+R3#conf term
+R3(config)#
+hostname SanJose2
+interface Loopback0
+ip address 172.16.32.1 255.255.255.0
+exit
+interface Serial4/1
+description R3 --> R1
+ip address 192.168.1.2 255.255.255.252
+clock rate 128000
+no shutdown
+exit
+interface Serial4/2
+description R1 --> R2
+ip address 172.16.1.2 255.255.255.0
+no shutdown
+end
+
+
+STEP 2:-
+R2:-
+SanJose1(config)# router eigrp 1
+SanJose1(config-router)# network 172.16.0.0
+
+R3:-
+SanJose2(config)# router eigrp 1
+SanJose2(config-router)# network 172.16.0.0
+
+
+STEP 3:-
+a.
+R2:-
+SanJose1(config)# router bgp 64512
+SanJose1(config-router)# 
+neighbor 172.16.32.1 remote-as 64512
+neighbor 172.16.32.1 update-source lo0
+
+b.
+R3:-
+SanJose2(config)# 
+router bgp 64512
+neighbor 172.16.64.1 remote-as 64512
+neighbor 172.16.64.1 update-source lo0
+
+c.
+R3:-
+SanJose2# show ip bgp neighbors
+
+STEP 4:-
+a.
+R1:-
+ISP(config)# router bgp 200
+
+ISP(config-router)# 
+neighbor 192.168.1.6 remote-as 64512
+neighbor 192.168.1.2 remote-as 64512
+network 192.168.100.0
+
+
+b.
+R2:-
+SanJose1(config)# 
+ip route 172.16.0.0 255.255.0.0 null0
+
+c.
+R2:-
+SanJose1(config)# router bgp 64512
+
+SanJose1(config-router)# 
+neighbor 192.168.1.5 remote-as 200
+network 172.16.0.0
+
+d.
+R2:-
+SanJose1# show ip bgp neighbors
+
+e.
+R3:-
+SanJose2(config)# 
+ip route 172.16.0.0 255.255.0.0 null0
+router bgp 64512
+
+SanJose2(config-router)# 
+neighbor 192.168.1.1 remote-as 200
+network 172.16.0.0
+
+STEP 5:-
+a.
+R3:-
+SanJose2# show ip bgp summary
+
+STEP 6:-
+a.
+R1:-
+ISP#clear ip bgp *
+
+b.
+R1:-
+ISP#ping 172.16.64.1
+
+c.
+R1:-
+ISP# ping 172.16.32.1
+
+d.
+R1:-
+ISP# show ip bgp
+
+e.
+R1:-
+ISP# ping 172.16.1.1 source 192.168.100.1
+
+ISP# ping 172.16.32.1 source 192.168.100.1
+
+ISP# ping 172.16.1.2 source 192.168.100.1
+
+ISP# ping 172.16.64.1 source 192.168.100.1
+
+ISP# ping
+Protocol [ip]:
+Target IP address: 172.16.64.1
+Repeat count [5]:
+Datagram size [100]:
+Timeout in seconds [2]:
+Extended commands [n]: y
+Source address or interface: 192.168.100.1
+Type of service [0]:
+Set DF bit in IP header? [no]:
+Validate reply data? [no]:
+Data pattern [0xABCD]:
+Loose, Strict, Record, Timestamp, Verbose[none]:
+Sweep range of sizes [n]:
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 172.16.64.1, timeout is 2 seconds:
+Packet sent with a source address of 192.168.100.1
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 20/20/24 ms
+ISP#
+
+
+STEP 7:-
+a.
+R1:-
+ISP(config)# router bgp 200
+
+ISP(config-router)# 
+network 192.168.1.0 mask 255.255.255.252
+network 192.168.1.4 mask 255.255.255.252
+
+b.
+R1:-
+ISP# show ip bgp
+
+c.
+R3:-
+SanJose2# show ip route
+
+d.
+R1:-
+ISP(config)# router bgp 200
+ISP(config-router)#
+no network 192.168.1.0 mask 255.255.255.252
+no network 192.168.1.4 mask 255.255.255.252
+exit
+ISP(config)# 
+interface serial 4/1
+shutdown
+
+e.
+R3:-
+SanJose2# show ip bgp
+
+SanJose2# show ip route
+
+f.
+R2:-
+SanJose1(config)# router bgp 64512
+SanJose1(config-router)# neighbor 172.16.32.1 next-hop-self
+
+R3:-
+SanJose2(config)# router bgp 64512
+SanJose2(config-router)# neighbor 172.16.64.1 next-hop-self
+
+
+g.
+R2:-
+SanJose1# clear ip bgp *
+SanJose1#
+
+R3:-
+SanJose2# clear ip bgp *
+SanJose2#
+
+h.
+R2:-
+SanJose2# show ip bgp
+
+SanJose2# show ip route
+
+i.
+R1:-
+ISP(config)# 
+interface serial 4/1
+ISP(config-if)# 
+no shutdown
+
+R2:-
+SanJose2# show ip route
+
+
+STEP 8:-
+a.
+R2:-
+SanJose1(config)# 
+route-map PRIMARY_T1_IN permit 10
+
+SanJose1(config-route-map)# 
+set local-preference 150
+exit
+
+SanJose1(config)# 
+router bgp 64512
+
+SanJose1(config-router)# 
+neighbor 192.168.1.5 route-map PRIMARY_T1_IN in
+
+R3:-
+SanJose2(config)# 
+route-map SECONDARY_T1_IN permit 10
+
+SanJose2(config-route-map)# 
+set local-preference 125
+exit
+
+SanJose2(config)# 
+router bgp 64512
+
+SanJose2(config-router)# 
+neighbor 192.168.1.1 route-map SECONDARY_T1_IN in
+
+b.
+R2:-
+SanJose1# clear ip bgp * soft
+
+R3:-
+SanJose2# clear ip bgp * soft
+
+SanJose2# show ip bgp
+
+
+STEP 9:-
+a.
+R1:-
+ISP# show ip bgp
+
+ISP# show ip route
+
+b.
+R3:-
+SanJose2# ping
+Protocol [ip]:
+Target IP address: 192.168.100.1
+Repeat count [5]:
+Datagram size [100]:
+Timeout in seconds [2]:
+Extended commands [n]: y
+Source address or interface: 172.16.32.1
+Type of service [0]:
+Set DF bit in IP header? [no]:
+Validate reply data? [no]:
+Data pattern [0xABCD]:
+Loose, Strict, Record, Timestamp, Verbose[none]: record
+Number of hops [ 9 ]:
+Loose, Strict, Record, Timestamp, Verbose[RV]:
+Sweep range of sizes [n]:
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.100.1, timeout is 2 seconds:
+Packet sent with a source address of 172.16.32.1
+Packet has IP options: Total option bytes= 39, padded length=4
+
+c.
+R2:-
+SanJose1(config)#
+route-map PRIMARY_T1_MED_OUT permit 10
+set Metric 50
+exit
+
+SanJose1(config)#
+router bgp 64512
+neighbor 192.168.1.5 route-map PRIMARY_T1_MED_OUT out
+
+R3:-
+SanJose2(config)#
+route-map SECONDARY_T1_MED_OUT permit 10
+set Metric 75
+exit
+
+SanJose2(config)#
+router bgp 64512
+neighbor 192.168.1.1 route-map SECONDARY_T1_MED_OUT out
+
+
+d.
+R2:-
+SanJose1# clear ip bgp * soft
+
+R3:-
+SanJose2# clear ip bgp * soft
+
+R2:-
+SanJose1# show ip bgp
+
+R3:-
+SanJose2# show ip bgp
+
+e.
+R3:-
+SanJose2# ping
+Protocol [ip]:
+Target IP address: 192.168.100.1
+Repeat count [5]:
+Datagram size [100]:
+Timeout in seconds [2]:
+Extended commands [n]: y
+Source address or interface: 172.16.32.1
+Type of service [0]:
+Set DF bit in IP header? [no]:
+Validate reply data? [no]:
+Data pattern [0xABCD]:
+Loose, Strict, Record, Timestamp, Verbose[none]: record
+Number of hops [ 9 ]:
+Loose, Strict, Record, Timestamp, Verbose[RV]:
+Sweep range of sizes [n]:
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.100.1
+
+R1:-
+ISP# show ip bgp
+
+STEP 10:-
+a.
+R1:-
+ISP(config)# router bgp 200
+
+ISP(config-router)# 
+neighbor 192.168.1.6 default-originate
+neighbor 192.168.1.2 default-originate
+
+exit
+ISP(config)# 
+interface loopback 10
+ip address 10.0.0.1 255.255.255.0
+
+
+b.
+R2:-
+SanJose1# show ip route
+
+R3:-
+SanJose2# show ip route
+
+c.
+R3:-
+SanJose2# show ip bgp
+
+d.
+R3:-
+SanJose2# traceroute 10.0.0.1
+
+R2:-
+SanJose1# show ip route
+
+SanJose2# show ip route
+
+e.
+R2:-
+SanJose1# trace 10.0.0.1
+
+
+
+
+
+
+
+
+
+
+
+Note:- STEP 7 d i changes
+
+
+
+
+
+
+
